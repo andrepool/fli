@@ -1,0 +1,69 @@
+# Copyright 2012, 2013 Andre Pool
+# Licensed under the Apache License version 2.0
+# You may not use this file except in compliance with this License
+# You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+create diagram how functions are related
+
+create diagram how processes are related
+
+create data analyzer
+
+add modelsim force and no force to API
+
+use more advanced c functions to show c advantage e.g. and sine function generator
+
+add more explanation in code
+
+get prompt back in transcript window after run -all
+
+use generic in vhdl to set filter coefficients in c fir filter
+
+generate bandstop fir filter with matlab
+
+use signal generator to create bode plot (gain/phase) of fir filter
+e.g. 2048 different frequencies 
+
+buf SOCK_BUF_PAYLOAD_SIZE above 512kByte works with test server, but not with simulator
+
+does it make sense and is it possible to start the housekeeping process from a timer instead of a trigger on clk or does it make sense to use a clk/100 signal?
+
+check which functions should be static and which not
+
+add xilinx implementation directory, e.g. spartan3 starter kit
+
+add altera implementation directory
+
+change the malloc for command processing by using an ack value for all processes and use check this in the server to deside if we are are ready
+
+when simulator in command line mode (cli = non gui mode) (cd rtl; make vsimc) most mti commands (./control_application -m uptime) do not work, e.g. data, whoami, uptime. But e.g. pwd works, this is wierd, why would they work on gui but on on cli?
+
+figure out from the control application if the simulator is in batch (cli) mode or gui mode (so we can skip wave commands)
+
+test server for socket test in socket (cd socket; make test) should provide better information to client for mti functions
+
+use semaphore to signal functions e.g. server sends semaphore to housekeeping (instead of mutex)
+
+implement tcl client
+
+use std_logic_vector in dut
+
+use asserts in code (and add aditional target with -DNDEBUG flag to disable this debuging)
+
+add example with POSIX shared memory (see chapter 54) of the Linux Programming Interface"
+
+when simulator in batch mode, the client responds with "ERROR   only 0 bytes received instead of 20 bytes, abord now" when sending a quit, this does not happen in qui mode, probably because the batch mode simulator quits to fast
+
+socket test with test server should report better values on the client
+
+mti cmd does not return any information in shown in control_application -m e.g. INFO    mti cmd 'noforce /top/d0/cnt' returns ''
+
+mti cmd tcl value is hex instead of decimal
+
+add command that can get a sequence of signal values, so the client can calculate e.g. the max, min, mean and average in block (visible window)
+
+add memory which we efficiently can fill through fli, the address is generated from the counter
+
+correct the vcom dependency rule because the entities are not anymore visiable in the work directory with questasim version 10.2
+
+use an rtl description for the memory, but also a foreign implementation of the memory
