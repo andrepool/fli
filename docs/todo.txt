@@ -1,4 +1,4 @@
-# Copyright 2012, 2013 Andre Pool
+# Copyright 2012 - 2014 Andre Pool
 # Licensed under the Apache License version 2.0
 # You may not use this file except in compliance with this License
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -15,7 +15,7 @@ use more advanced c functions to show c advantage e.g. and sine function generat
 
 add more explanation in code
 
-get prompt back in transcript window after run -all
+get prompt back in transcript window after run -all (if possible)
 
 use generic in vhdl to set filter coefficients in c fir filter
 
@@ -36,23 +36,17 @@ add altera implementation directory
 
 change the malloc for command processing by using an ack value for all processes and use check this in the server to deside if we are are ready
 
-when simulator in command line mode (cli = non gui mode) (cd rtl; make vsimc) most mti commands (./control_application -m uptime) do not work, e.g. data, whoami, uptime. But e.g. pwd works, this is wierd, why would they work on gui but on on cli?
-
-figure out from the control application if the simulator is in batch (cli) mode or gui mode (so we can skip wave commands)
-
 test server for socket test in socket (cd socket; make test) should provide better information to client for mti functions
 
 use semaphore to signal functions e.g. server sends semaphore to housekeeping (instead of mutex)
 
-implement tcl client
+implement tcl client (obsolete because of python client)
 
 use std_logic_vector in dut
 
 use asserts in code (and add aditional target with -DNDEBUG flag to disable this debuging)
 
-add example with POSIX shared memory (see chapter 54) of the Linux Programming Interface"
-
-when simulator in batch mode, the client responds with "ERROR   only 0 bytes received instead of 20 bytes, abord now" when sending a quit, this does not happen in qui mode, probably because the batch mode simulator quits to fast
+add example with POSIX shared memory (see chapter 54) of the Linux Programming Interface" (not required because AF UNIX sockets is realy fast)
 
 socket test with test server should report better values on the client
 
@@ -67,3 +61,17 @@ add memory which we efficiently can fill through fli, the address is generated f
 correct the vcom dependency rule because the entities are not anymore visiable in the work directory with questasim version 10.2
 
 use an rtl description for the memory, but also a foreign implementation of the memory
+
+report issue Mentor that vish memory usage increases rapidly when moving / updating wave windows, test with ./control_application -l -1
+
+add mti_ForceSignal to api (or mtiSetSignalValue)
+
+add mti_ReleaseSignal to api
+
+add mti_GetSignalValue to api (return value mtiInt32T)
+
+add mti_GetSignalValueIndirect to api
+
+create list of all signals (mti_FindPorts)in the application including their signal_id. for e.g. search with signal name => signal_id => mti_ForceSignal 
+
+replace command to cmd_resp because the field is used for as wel command as response

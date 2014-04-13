@@ -8,6 +8,7 @@
 #include "mti.h"
 #include "server_functions.h"
 #include "sock_functions.h"
+#include "test_server_functions.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -17,44 +18,28 @@
 The receive buffer is filled by the client and the transmit buffer will be send to the client.
 The message can be with or without payload.
 */
-void process_command_from_client( int *disconnect, int *shutdown )
+void process_command_from_client( int *disconnect )
 {
    int ii = 0;
+
+   // printf( "rx cmd 0x%08x siz 0x%08x adr 0x%08x pl 0x%08x 0x%08x\n", gv.receive.command, gv.receive.size, gv.receive.addr, gv.receive.pl.u32[0], gv.receive.pl.u32[1]); fflush(stdout);
   
    // set defaults response and buffer size, only a few cases need other values
    gv.transmit.size = SOCK_BUF_HEADER_SIZE;
-   gv.transmit.data = 0;
    gv.transmit.command = OKAY;
    if( gv.receive.command == API_GET )
    {
-      gv.transmit.data = API_VERSION;
+      gv.transmit.pl.u32[0] = API_VERSION;
+      gv.transmit.size += 4;
    }
    else if( gv.receive.command == DISCONNECT )
    {
       *disconnect = 1;
    }   
-   else if( gv.receive.command == SERVER_SHUTDOWN )
-   {
-      if( gv.receive.data == SERVER_SHUTDOWN_MAGIC )
-      {
-         *shutdown = 1;
-         sprintf( gv.transmit.pl.c8, "server shutdown requisted by control application" );
-         gv.transmit.size =  SOCK_BUF_HEADER_SIZE + strlen( gv.transmit.pl.c8 ) + 1; // +1 -> termination character
-         printf( "INFO    %s\n", gv.transmit.pl.c8 );
-      }
-      else
-      {
-         sprintf( gv.transmit.pl.c8, "client tried to shutdown server, but used wrong 0x%08x shutdown value", gv.receive.data );
-         gv.transmit.size =  SOCK_BUF_HEADER_SIZE + strlen( gv.transmit.pl.c8 ) + 1; // +1 -> termination character
-         gv.transmit.command = ERROR;
-         printf( "ERROR   %s\n", gv.transmit.pl.c8 );
-         fflush(stdout);
-         *disconnect = 1;
-      }
-   }   
    else if( gv.receive.command == SUM_GET )
    {
-      gv.transmit.data = gv.sum;
+      gv.transmit.pl.u32[0] = gv.sum;
+      gv.transmit.size += 4;     
    }
    else if( gv.receive.command == SUM_INC )
    {
@@ -68,15 +53,15 @@ void process_command_from_client( int *disconnect, int *shutdown )
    {
       printf("INFO    set sum from %d to ", gv.sum );
       pthread_mutex_lock( &gv_mutex_lock );
-      gv.sum = gv.receive.data;
+      gv.sum = gv.receive.pl.u32[0];
       pthread_mutex_unlock( &gv_mutex_lock );
       printf("%d\n", gv.sum );
    }
    else if( gv.receive.command == PAYLOAD_WRITE )
    {
-      // printf( "INFO    receive  %d words from client\n", gv.receive.words );
+      // printf( "INFO    receive  %d bytes payload from client\n", gv.receive.size - SOCK_BUF_HEADER_SIZE );
       pthread_mutex_lock( &gv_mutex_lock );
-      for( ii = 0; ii < gv.receive.words; ii++ )
+      for( ii = 0; ii < ((gv.receive.size - SOCK_BUF_HEADER_SIZE)/4); ii++ )
       {
          // PAYLOAD_WRITE data in global memory buffer
          gv.memory[(gv.receive.addr) + ii] = gv.receive.pl.u32[ii];
@@ -85,14 +70,14 @@ void process_command_from_client( int *disconnect, int *shutdown )
    }
    else if( gv.receive.command == PAYLOAD_READ )
    {
-      for( ii = 0; ii < gv.receive.words; ii++ )
+      // amount or requested bytes in payload u32[0]
+      for( ii = 0; ii < (gv.receive.pl.u32[0]/4); ii++ )
       {
          // read data from global memory buffer
          gv.transmit.pl.u32[ii] = gv.memory[(gv.receive.addr) + ii];
       }
-      gv.transmit.words = gv.receive.words; // same amount of words as requested
-      gv.transmit.size = SOCK_BUF_HEADER_SIZE + (gv.receive.words<<2);
-      // printf( "INFO    transmit %d words to client\n", gv.receive.words );
+      gv.transmit.size = SOCK_BUF_HEADER_SIZE + gv.receive.pl.u32[0];
+      // printf( "INFO    transmit %d bytes payload to client\n", gv.receive.pl.u32[0] );
    }
    else
    {
@@ -105,6 +90,7 @@ void process_command_from_client( int *disconnect, int *shutdown )
 
       // now wait for the response from a modelsim process
       int print_warning = 0;
+      if( gv.handshake == 0 ) { test_server_provide_data(); }
       while( gv.buf_acknowledge == 0 && gv.handshake == 1 && print_warning < 5000 )
       {
          if( print_warning % 1000 == 999 )
@@ -129,11 +115,8 @@ void process_command_from_client( int *disconnect, int *shutdown )
             // printf( "INFO    message: %s\n", gv.transmit.pl.c8 );
          }
       }
-
-      // in case the quit command was requested, which will be processed by the housekeeping process,
-      // the server can be shutdown
-      if( ( gv.receive.command == MTI_QUIT ) && ( gv.receive.data == MTI_QUIT_MAGIC ) ) {  *shutdown = 1; }
    }
+   // printf( "tx cmd 0x%08x siz 0x%08x adr 0x%08x pl 0x%08x 0x%08x\n", gv.transmit.command, gv.transmit.size, gv.transmit.addr, gv.transmit.pl.u32[0], gv.transmit.pl.u32[1]); fflush(stdout);
 }
 
 /* 
@@ -144,7 +127,7 @@ Only when the client is disconnected, this function will return, otherwise
 this function will wait for the following command and respond with the appropriate
 message.
  */
-void server_exchange_with_client( int *client_sock_file_desc, int *shutdown )
+void server_exchange_with_client( int *client_sock_file_desc )
 {
    // create buffer which we can use to receive and transmit data
    int disconnect = 0;
@@ -180,7 +163,7 @@ void server_exchange_with_client( int *client_sock_file_desc, int *shutdown )
          {
             // a "valid" message has been received from client, now process the message
             // printf( "recieved %d bytes\n", gv.receive.size );
-            process_command_from_client( &disconnect, shutdown );
+            process_command_from_client( &disconnect );
             // printf("transmitted %d bytes\n", gv.receive.size );
          }
          // send the appropriate message back to the client
@@ -201,7 +184,7 @@ void server_exchange_with_client( int *client_sock_file_desc, int *shutdown )
          }
       }
    }
-   // we keep on looping until a shutdown or disconnect is requisted or an error occurred in which
-   // case we also disconnect with the client and wait for a new connection
-   while( ( *shutdown == 0 ) && (disconnect == 0 ) );
+   // we keep on looping until a disconnect is requisted
+   // an error can also result in a disconnect in which the client has to reconnect again
+   while( disconnect == 0 );
 }

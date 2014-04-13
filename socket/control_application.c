@@ -1,4 +1,4 @@
-// Copyright 2012, 2013 Andre Pool
+// Copyright 2012 - 2014 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -16,13 +16,19 @@
 #include "sock_functions.h"
 
 // function used to transmit a message the to server and also expect a message back from the server
-// the message can only be the header (words 0) or header + payload (words > 0)
+// the message can be with or without a payload
 void exchange( int *client_sock_file_desc, sock_buf_t *buf )
 {
    // set the buffer size depending on payload (if any), which can be a string or amount of words the message
    if( buf->command == PAYLOAD_WRITE ) 
    {
-      buf->size = SOCK_BUF_HEADER_SIZE + (buf->words * 4);
+      // buf->size already set by the PAYLOAD_WRITE
+   }
+   else if( buf->command == SUM_SET || \
+            buf->command == MTI_QUIT || \
+            buf->command == PAYLOAD_READ )
+   {
+      buf->size = SOCK_BUF_HEADER_SIZE + 4; // payload is one 32 bit word
    }
    else if( buf->command == MTI_FIRST_LOWER_REGION || \
             buf->command == MTI_NEXT_REGION || \
@@ -33,12 +39,14 @@ void exchange( int *client_sock_file_desc, sock_buf_t *buf )
             buf->command == MTI_GET_REGION_SOURCE_NAME || \
             buf->command == MTI_GET_SECONDARY_NAME )
    {
-      buf->size = 8 + SOCK_BUF_HEADER_SIZE; // payload is one 64 bit word
+      buf->size = SOCK_BUF_HEADER_SIZE + 8; // payload is one 64 bit word
    }
-   else if( buf->command == MTI_CMD || buf->command == MTI_COMMAND || buf->command == TRANSCRIPT_PRINT )
+   else if( buf->command == MTI_CMD || \
+            buf->command == MTI_COMMAND || \
+            buf->command == TRANSCRIPT_PRINT )
    {
       // also send the termination (null) character at the end of the string
-      buf->size = 1 + strlen( buf->pl.c8 ) + SOCK_BUF_HEADER_SIZE;
+      buf->size = SOCK_BUF_HEADER_SIZE + strlen( buf->pl.c8 ) + 1;
    }
    else if( buf->command == SEND_EMPTY_MESSAGE )
    {
@@ -50,9 +58,10 @@ void exchange( int *client_sock_file_desc, sock_buf_t *buf )
       // only send the header
       buf->size = SOCK_BUF_HEADER_SIZE;
    }
+   
    // printf( "INFO    exchange: send %10d bytes, ", buf->size ); fflush(stdout);
    // printf( "command %d\n", buf->command );
-   // printf( "data : 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x\n", buf->command, buf->size, buf->data, buf->addr, buf->words );
+   // printf( "data : 0x%08x 0x%08x 0x%08x\n", buf->command, buf->size, buf->addr );
    int bytes_transmitted = sock_transmit_data( client_sock_file_desc, buf );
    if( bytes_transmitted != buf->size )
    {
@@ -86,22 +95,23 @@ void data_test( int *client_sock_file_desc, sock_buf_t *buf )
    for( size_t ii = 0; ii < 3; ii++ )
    {
       buf->command = PAYLOAD_WRITE;
-      buf->words = SOCK_BUF_PAYLOAD_SIZE>>2;
       buf->addr = 0;
+      buf->size = SOCK_BUF_HEADER_SIZE + SOCK_BUF_PAYLOAD_SIZE;
       // fill buffer with stimuli
       int jj;
-      for( jj = 0; jj < (SOCK_BUF_PAYLOAD_SIZE>>2); jj++ )
+      for( jj = 0; jj < (SOCK_BUF_PAYLOAD_SIZE/4); jj++ )
       {
          buf->pl.u32[jj] = 0xdead0000 + jj + ii*10000;
       }
       exchange( client_sock_file_desc, buf );
    
       buf->command = PAYLOAD_READ;
-      buf->words = SOCK_BUF_PAYLOAD_SIZE>>2;
       buf->addr = 0;
+      buf->pl.u32[0] = SOCK_BUF_PAYLOAD_SIZE; // requested amount of bytes in first u32 payload
+      buf->size = SOCK_BUF_HEADER_SIZE + 4;
       exchange( client_sock_file_desc, buf );
       // check return values from server
-      for( jj = 0; jj < (SOCK_BUF_PAYLOAD_SIZE>>2); jj++ )
+      for( jj = 0; jj < (SOCK_BUF_PAYLOAD_SIZE/4); jj++ )
       {
          if( buf->pl.u32[jj] != ( 0xdead0000 + jj + ii*10000 ) )
          {
@@ -115,7 +125,7 @@ void wave_test( int *client_sock_file_desc, sock_buf_t *buf, unsigned long int i
 {
    buf->command = TIME_GET_RES;
    exchange( client_sock_file_desc, buf );
-   int mti_res = (int) buf->data;
+   int mti_res = (int) buf->pl.u32[0];
    char mti_res_text[16] = "undefined";
    if( mti_res == -6 ) { sprintf( mti_res_text, "us" ); }
    if( mti_res == -7 ) { sprintf( mti_res_text, "* 100 ns" ); }
@@ -132,14 +142,29 @@ void wave_test( int *client_sock_file_desc, sock_buf_t *buf, unsigned long int i
    char time_string[32]; // used to store the thousands comma separated time string
    thousands_comma( time_string, 4, mti_time );
    printf( "INFO    iteration %12lu, current time %20s %s\n", iteration, time_string, mti_res_text );
-   
-   buf->command = MTI_CMD;
-   sprintf( buf->pl.c8, "wave zoomrange %llu %llu", (long long unsigned)(mti_time - 20000), (long long unsigned)mti_time );
-   exchange( client_sock_file_desc, buf );
 
    buf->command = MTI_CMD;
-   sprintf( buf->pl.c8, "wave cursor add -name \"Cursor 1\" -time %llu", (long long unsigned)(mti_time - 10000) );
+   sprintf( buf->pl.c8, "batch_mode" );
    exchange( client_sock_file_desc, buf );
+   if( ( buf->pl.c8[0] != 49 ) && ( mti_time > 20000 ) ) // wave commands are not accepted in batch mode => ascii 49 = 1
+   {
+      // Warning: due to a bug in ModelSim/QuestaSim the following wave commands increases vish memory usage
+      buf->command = MTI_CMD;
+      sprintf( buf->pl.c8, "wave zoom range %llu %llu", (long long unsigned)(mti_time - 20000), (long long unsigned)mti_time );
+      exchange( client_sock_file_desc, buf );
+      if( buf->pl.c8[0] == 48 ) // returns string with left and right time => ascii 48 = 0
+      {
+         printf( "ERROR   wave zoom range command not accepted, return value '%s'\n", buf->pl.c8 ); 
+      }
+
+      buf->command = MTI_CMD;
+      sprintf( buf->pl.c8, "wave cursor add -name \"Cursor 1\" -time %llu", (long long unsigned)(mti_time - 10000) );
+      exchange( client_sock_file_desc, buf );
+      if( buf->pl.c8[0] != 49 )  // returns cursor number => ascii 49 = 1
+      { 
+         printf( "ERROR   wave cursor add command not accepted, return value '%s'\n", buf->pl.c8 ); 
+      }
+   }
 }
 
 void pre_commands( int *client_sock_file_desc, sock_buf_t *buf )
@@ -153,18 +178,18 @@ void pre_commands( int *client_sock_file_desc, sock_buf_t *buf )
 
    buf->command = COUNTER_GET;
    exchange( client_sock_file_desc, buf );
-   printf( "INFO    current count value %4d", buf->data );
+   printf( "INFO    current count value %4d", buf->pl.u32[0] );
    buf->command = SQRT_INT_GET;
    exchange( client_sock_file_desc, buf );
-   printf( " current sqrt value %3d\n", buf->data );
+   printf( " current sqrt value %3d\n", buf->pl.u32[0] );
 
    buf->command = SUM_GET;
    exchange( client_sock_file_desc, buf );
-   uint32_t sum = buf->data;
+   uint32_t sum = buf->pl.u32[0];
    printf( "INFO    get sum %u from server, ", sum );
 
    buf->command = SUM_SET;
-   buf->data = sum + 1;
+   buf->pl.u32[0] = sum + 1;
    exchange( client_sock_file_desc, buf );
 
    buf->command = SUM_INC;
@@ -172,7 +197,7 @@ void pre_commands( int *client_sock_file_desc, sock_buf_t *buf )
       
    buf->command = SUM_GET;
    exchange( client_sock_file_desc, buf );
-   printf( "after sum + 1 and inc, sum gets %u\n", buf->data );
+   printf( "after sum + 1 and inc, sum gets %u\n", buf->pl.u32[0] );
 
    buf->command = MTI_CMD;
    sprintf( buf->pl.c8, "date" );
@@ -311,7 +336,7 @@ void hierarchy_recusive( int *client_sock_file_desc, sock_buf_t *buf, uint64_t r
 void hierarchy( int *client_sock_file_desc, sock_buf_t *buf )
 {
    printf( "INFO    %-15s %-10s %-10s %-10s %-15s %-s\n", "File", "Library", "Hierarchy", "Instance", "Entity", "Archictecture" );
-   // region represents a pointer, which is 64 bit on x86_64 and 32 bit on x68, so use payload of 8 bytest instead of 32 bit data field
+   // region represents a pointer, which is 64 bit on x86_64 and 32 bit on x86, so use always payload of 8 bytes
    uint64_t region = mti_get_top_region( client_sock_file_desc, buf );
 
    hierarchy_recusive( client_sock_file_desc, buf, region, 0 );
@@ -345,15 +370,15 @@ void api_version_check( int *client_sock_file_desc, sock_buf_t *buf, int verbose
    buf->command = API_GET;
    exchange( client_sock_file_desc, buf );
 
-   if( buf->data != API_VERSION )
+   if( buf->pl.u32[0] != API_VERSION )
    {
-      printf( "ERROR   server has %d api version, while client has %d api version\n", buf->data, API_VERSION );
+      printf( "ERROR   server has %d api version, while client has %d api version\n", buf->pl.u32[0], API_VERSION );
       exit( EXIT_FAILURE );
    }
 
    if( verbose != 0 )
    {
-      printf( "INFO    server API version %d\n", buf->data );
+      printf( "INFO    server API version %d\n", buf->pl.u32[0] );
    }
 }
 
@@ -365,13 +390,9 @@ void process_command( int *client_sock_file_desc, sock_buf_t *buf, int command, 
       // also copy termination (null) character at the end of the string
       memcpy( buf->pl.c8, optarg, ( 1 + strlen( optarg ) ) );
    }
-   else if( command == SERVER_SHUTDOWN )
-   {
-      buf->data = SERVER_SHUTDOWN_MAGIC;
-   }
    else if( command == MTI_QUIT )
    {
-      buf->data = MTI_QUIT_MAGIC;
+      buf->pl.u32[0] = MTI_QUIT_MAGIC;
    }
 
    exchange( client_sock_file_desc, buf );
@@ -390,7 +411,6 @@ void sock_help( char *argv[] )
    printf( "-b           send break to simulator\n" );
    printf( "-t           do some basic testing\n" );
    printf( "-q           quit simulator thread and server thread\n" );
-   printf( "-s           shutdown server thread but simulator thread stays active\n" );
    printf( "-l number    connect for n (unsigned long) times with server\n" );
    printf( "-m command   modelsim tcl command\n" );
    printf( "-p message   print messege on simulator console\n" );
@@ -407,7 +427,7 @@ int main(int argc, char *argv[])
    int option = -1;
 
    // first process the options that do not require a connection
-   while ((option = getopt (argc, argv, "bthl:m:p:qsvw")) != -1)
+   while ((option = getopt (argc, argv, "bthl:m:p:qvw")) != -1)
    {
       switch (option)
       {
@@ -451,11 +471,7 @@ int main(int argc, char *argv[])
                break;
             case 'q':
                process_command( &client_sock_file_desc, &buf, MTI_QUIT, optarg, 1 );
-               close( client_sock_file_desc );
-               return EXIT_SUCCESS;
-               break;
-            case 's':
-               process_command( &client_sock_file_desc, &buf, SERVER_SHUTDOWN, optarg, 1 );
+               process_command( &client_sock_file_desc, &buf, DISCONNECT, optarg, 1 );
                close( client_sock_file_desc );
                return EXIT_SUCCESS;
                break;

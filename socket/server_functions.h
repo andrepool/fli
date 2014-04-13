@@ -15,6 +15,6 @@
  - create response
  - send response to client
 */
-void server_exchange_with_client( int *client_sock_file_desc, int *shutdown );
+void server_exchange_with_client( int *client_sock_file_desc );
 
 #endif /* INCLUDED_SERVER_FUNCTIONS_H */

@@ -52,7 +52,8 @@ static void sqrt_int ( void *param )
       if( gv.receive.command == SQRT_INT_GET )
       {
          gv_valid( 0 ); // command is accepted by this process
-         gv.transmit.data = output;
+         gv.transmit.pl.u32[0] = output;
+         gv.transmit.size += 4;
          gv_acknowledge( 1 ); // response of this process is ready
       }
    }

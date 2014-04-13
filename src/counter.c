@@ -68,7 +68,8 @@ static void counter( void *param )
       if( gv.receive.command == COUNTER_GET )
       {
          gv_valid( 0 ); // command is accepted by this process
-         gv.transmit.data = cnt;
+         gv.transmit.pl.u32[0] = cnt;
+         gv.transmit.size += 4;
          gv_acknowledge( 1 ); // response of this process is ready
       }
    }

@@ -8,6 +8,7 @@
 #include "global_var.h"
 
 #include <string.h>
+#include <sys/time.h>
 
 void housekeeping( void *param )
 {
@@ -34,8 +35,7 @@ void housekeeping( void *param )
       else if( gv.receive.command == TRANSCRIPT_PRINT )
       {
          gv_valid( 0 ); // command is accepted by this process
-         printf( "%s\n", gv.receive.pl.c8 );
-         fflush(stdout);
+         printf( "%s\n", gv.receive.pl.c8 ); fflush(stdout);
          gv_acknowledge( 1 ); // response of this process is ready
       }
       else if( gv.receive.command == MTI_VERSION_GET )
@@ -56,7 +56,8 @@ void housekeeping( void *param )
       else if( gv.receive.command == TIME_GET_RES )
       {
          gv_valid( 0 ); // command is accepted by this process
-         gv.transmit.data = (uint32_t) mti_GetResolutionLimit( );
+         gv.transmit.pl.u32[0] = (uint32_t) mti_GetResolutionLimit( );
+         gv.transmit.size += 4;
          gv_acknowledge( 1 ); // response of this process is ready
       }
       else if( gv.receive.command == MTI_CMD )
@@ -160,7 +161,7 @@ void housekeeping( void *param )
       else if( gv.receive.command == MTI_QUIT )
       {
          gv_valid( 0 );
-         if( gv.receive.data == MTI_QUIT_MAGIC )
+         if( gv.receive.pl.u32[0] == MTI_QUIT_MAGIC )
          {
              printf( "WARNING simulator quit requested by configuration application\n"); fflush(stdout);
              sprintf( gv.transmit.pl.c8, "simulator has stopped" );
@@ -168,15 +169,27 @@ void housekeeping( void *param )
          }
          else
          {
-            sprintf( gv.transmit.pl.c8, "ERROR   simulator quit request has wrong magic 0x%08x instead of 0x%08x", gv.receive.data, MTI_QUIT_MAGIC );
+            sprintf( gv.transmit.pl.c8, "ERROR   simulator quit request has wrong magic 0x%08x instead of 0x%08x", gv.receive.pl.u32[0], MTI_QUIT_MAGIC );
             gv.transmit.size =  SOCK_BUF_HEADER_SIZE + strlen( gv.transmit.pl.c8 ) + 1; // +1 -> termination character
             gv.transmit.command = ERROR;
             printf( "%s\n", gv.transmit.pl.c8 ); fflush(stdout);
          }
          gv_acknowledge( 1 );
 
-         if( gv.receive.data == MTI_QUIT_MAGIC )
+         if( gv.receive.pl.u32[0] == MTI_QUIT_MAGIC )
          {
+            // we want to be able to show the quit message in the simulator window and using the clean
+            // disconnect function of the client
+            // unfortunately the sleep function does not work so use the gettimeofday instead
+            struct timeval tv;
+            gettimeofday(&tv, NULL); 
+            long current_time = tv.tv_sec;
+            long stop_time = current_time + 2; // use at least +2 = > 1 second so the client has time to execute the disconnect
+            while ( current_time < stop_time )
+            {
+               gettimeofday(&tv, NULL);
+               current_time = tv.tv_sec;
+            }
             mti_Quit( );
          }
       }

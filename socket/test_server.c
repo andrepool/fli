@@ -27,12 +27,6 @@ of the simulation environment.
 #include <string.h>
 #include <errno.h>
 
-char * mti_GetProductVersion( ) { return "ModelSim Test Server Version x.xx xxxx.xx"; }
-uint32_t mti_Now( ) { return 123; }
-uint32_t mti_NowUpper( ) { return 0;  }
-int32_t mti_GetResolutionLimit( ) {  return -9 ; }
-void mti_Break( ) { }
-
 int main( )
 {
    printf( "INFO    server API version %d\n", API_VERSION);
@@ -46,14 +40,13 @@ int main( )
    int server_sock_file_desc = sock_server_setup_and_listen( );
     
    printf("INFO    wait for client connection\n"); fflush(stdout);
-   int shutdown = 0;
    unsigned int ii = 0;
-   do
+   // the server will run until ctrl-c
+   while( 1 )
    {
-      // normally the client should stay connected, but in case the connection
-      // got lost, this loop takes care of reconnecting the client with the server
+      // this loop is entered each time the client (re)connects with the server
+      // wait until the client is connected to the server socket
 
-      // wait until client is connected to server socket
       int client_sock_file_desc = sock_server_wait_for_client( server_sock_file_desc );
       
       if( client_sock_file_desc > 0 )
@@ -62,15 +55,13 @@ int main( )
          {
             printf( "INFO    client connected to server for the 0x%08x time\n", ii );
          }
-         // the following function will return if one of the following events occurs:
-         // client disconnect or client server shutdown (quit) request
-         server_exchange_with_client( &client_sock_file_desc, &shutdown ); 
+         server_exchange_with_client( &client_sock_file_desc ); 
+         // at this moment the client has been disconnected
       }
-      // for some reason the client has been disconnected, close the client file handle
+      // the current file handle is not used by the client anymore
       close( client_sock_file_desc );
       ii++;
    }
-   while( shutdown == 0 );
 
    if( close( server_sock_file_desc ) < 0 )
    {
@@ -80,14 +71,6 @@ int main( )
    {
       printf( "WARNING errno message '%s', cannot unlink file handle\n", strerror( errno ) );
    }
-   if( shutdown != 0 )
-   {
-      printf( "INFO    client has requisted to shutdown the server\n" ); fflush(stdout);
-   }
-   else
-   {
-      printf( "ERROR   unknown reason why server has been stopped\n" ); fflush(stdout);
-   }
-   
+
    return 0;
 }

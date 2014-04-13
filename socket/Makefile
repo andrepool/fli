@@ -39,9 +39,22 @@ client: control_application
 	@./$< -p "####    first message from $< ####"
 	@./$< -t # some basic testing
 	@./$< -m "pwd" # test modelsim tcl command
+	@./$< -m "examine top/d0/cnt" # use modelsim tcl to get a value
+	@./$< -m "examine top/d0/sqrt" # use modelsim tcl to get a value
 	@./$< -v -l 10 # show hierarchy and connect 10 times
 	@echo "INFO    done with testing, send one last message to server"
 	@./$< -p "####    last  message from $< ####"
+
+force: control_application
+	@./$< -p "#### usse the force command through fli ####"
+	@./$< -t # some basic testing
+	@./$< -m "force top/rst TRUE"
+	@./$< -m "examine top/d0/cnt" # use modelsim tcl to get a value
+	@./$< -m "examine top/d0/sqrt" # use modelsim tcl to get a value
+	@./$< -m "noforce top/rst"
+	@./$< -m "examine top/d0/cnt" # use modelsim tcl to get a value
+	@./$< -m "examine top/d0/sqrt" # use modelsim tcl to get a value
+	@./$< -w # reposition wave window
 
 inf: control_application
 	@./$< -p "####    first message from $< ####" -t -w -m "pwd"
@@ -49,9 +62,15 @@ inf: control_application
 	@echo "INFO    done with testing, send one last message to server"
 	@./$< -p "####    last  message from $< ####"
 
+break: control_application
+	@echo "INFO    send break signal to simulator"
+	@./$< -p "####    control application has send break signal to simulator ####"
+	@./$< -p "####    type \"run -all\" in transcript window to continue ####" -b
+	@echo "INFO    type \"run -all\" in transcript window to continue"
+
 quit: control_application
 	@echo "INFO    control application request to quit simulator"
-	@./$< -p "####    now shutdown ####" -q
+	@./$< -p "####    control application message to inform simulator will quit now ####" -q
 
 
 clientq: client sleep quit
@@ -59,7 +78,7 @@ clientq: client sleep quit
 sleep: 
 	@sleep 2
 
-test_server: test_server.o global_var.o sock_functions.o server_functions.o
+test_server: test_server.o test_server_functions.o global_var.o sock_functions.o server_functions.o
 	gcc $(CFLAGS) -o $@ $^ -lm
 
 test: test_server

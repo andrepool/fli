@@ -10,7 +10,7 @@
 // pthread.h include required for ptread_t
 #include <pthread.h>
 
-#define API_VERSION 10
+#define API_VERSION 12
 #define SOCK_FILE_HANDLE "../socket/sock_file_handle"
 
 // Command list and response list.
@@ -24,10 +24,9 @@ typedef enum command_response_list {
    API_GET,
    COUNTER_GET,
    DISCONNECT, // sending disconnect is same as transmitting 0 bytes from the client to server
-   MTI_BREAK,
-   MTI_QUIT,
    ERROR,
    ERROR_MESSAGE_SIZE,
+   MTI_BREAK,
    MTI_CMD, // result not transcribed in transcript window but returned to control application
    MTI_COMMAND, // result in vsim transcript window
    MTI_FIRST_LOWER_REGION,
@@ -40,12 +39,12 @@ typedef enum command_response_list {
    MTI_GET_TOP_REGION,
    MTI_NEXT_REGION,
    MTI_PROC_TEST1,
+   MTI_QUIT,
    MTI_VERSION_GET,
    OKAY,
    PAYLOAD_READ,
    PAYLOAD_WRITE,
    SEND_EMPTY_MESSAGE, // sending 0 bytes, same server behaviour as disconnect, only for testingsame as disconnect, but only testing
-   SERVER_SHUTDOWN,
    SQRT_INT_GET,
    SUM_INC,
    SUM_GET,
@@ -56,8 +55,7 @@ typedef enum command_response_list {
    ZZ_DO_NOT_USE_LAST
 } command_response_t;
 
-// The simulator can only be shutdown when the command and the magic are correct.
-#define SERVER_SHUTDOWN_MAGIC 0xabcd1234
+// The simulator can only be stopped when the command and the magic are correct.
 #define MTI_QUIT_MAGIC 0xabcd0011
 
 // A sock_buf_t struct is used to assemble a message to and from the server.
@@ -67,11 +65,10 @@ typedef enum command_response_list {
 // The header exists of:
 // - command, which also can represent a response
 // - size in bytes of the message (header + payload)
-// - date which is used to exchange one 32 bit word between server and client
 // - addr used when a specific (start) address is required probably used together with
-//   the read and write command
-// - words represents the amount of 32 bit words that need to be read from or written to
-//   the payload
+//   the read and write command, for write the amount of bytes = size - header, for
+//   read the amount of bytes is requested by the first payload word u32[0]
+// - reserved field
 
 // The payload is optional, so the minimal size of the message is the size of the header.
 // The struct allows payload access through different data types, saving the need for
@@ -85,13 +82,13 @@ typedef enum command_response_list {
 // 512kB buffer (server = buffer + global memory = 1.5MB) and 512kB client = 2MB
 #define SOCK_BUF_PAYLOAD_SIZE ( 0x00080000 )
 
+// for efficient payload allignment on x86-64 the header should be a multiple of 64 bits
 typedef struct
 {
-   uint32_t command;
+   uint32_t command; // command or response
    uint32_t size; // message size in bytes
-   uint32_t data;
    uint32_t addr;
-   uint32_t words; // read or write amount of 32 bit words
+   uint32_t reserved;
    union
    {
       char c8[SOCK_BUF_PAYLOAD_SIZE]; // payload of char type (for gcc this is signed)

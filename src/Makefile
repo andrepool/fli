@@ -33,7 +33,7 @@ all: c_environment.so
 	gcc $(CFLAGS) $(INC) -o $@ -c $<
 
 # create one .so file for all c models so we can share the global variable gv
-%.so: testbench.o counter.o sqrt_int.o global_var.o housekeeping.o server.o sock_functions.o server_functions.o
+%.so: testbench.o counter.o sqrt_int.o global_var.o housekeeping.o server.o sock_functions.o server_functions.o test_server_functions.o
 	gcc $(LDFLAGS) -o $@ $^ -lm -lpthread
 
 clean:

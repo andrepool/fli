@@ -1,0 +1,13 @@
+#!/usr/bin/tclsh
+
+set hallo 1701209960
+# 6645351
+#  1701209960
+
+# binary format i3 {3 -3 65536 1}
+set my_hex [ binary format i $hallo ]
+
+puts "hex xx $my_hex xx ]"
+
+set lngt [ string bytelength $my_hex ]
+puts "string length $lngt"
