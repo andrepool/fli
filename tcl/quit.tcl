@@ -6,6 +6,8 @@
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
 puts "quit simulator"
+exec make -C ../socket control_application
+
 set capp "../socket/control_application"
 
 exec $capp -p "connection from tcl script at [clock format [clock seconds] -format %H:%M:%S] "

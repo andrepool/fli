@@ -1,4 +1,4 @@
-// Copyright 2012, 2013, 2014 Andre Pool
+// Copyright 2012 - 2015 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -34,7 +34,8 @@ void *server( void *arg )
    printf( "INFO    wait for client connection\n" ); fflush(stdout);
    unsigned int ii = 0;
    // the server will run as long as the simulator is running
-   while( 1 )
+   int shutdown = 0;
+   do
    {
       // this loop is entered each time the client (re)connects with the server
       // wait until the client is connected to the server socket
@@ -46,12 +47,17 @@ void *server( void *arg )
          {
             printf( "INFO    client connected to server for the 0x%08x time\n", ii ); fflush(stdout);
          }
-         server_exchange_with_client( &client_sock_file_desc );
+         server_exchange_with_client( &client_sock_file_desc, &shutdown );
          // at this moment the client has been disconnected
       }
-      // the current file handle is not used by the client anymore
+
+      // for AF_INIT, the client socket should be disconnected first to prevent the port locking TIME_WAIT
       close( client_sock_file_desc );
       ii++;
    }
+   while( shutdown == 0 );
+
+   // the current file handle (port) is not used by the server anymore, make it free for the next simulator
+   close( server_sock_file_desc );
    return ( void* )( 1 );
 }

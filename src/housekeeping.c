@@ -166,6 +166,7 @@ void housekeeping( void *param )
              printf( "WARNING simulator quit requested by configuration application\n"); fflush(stdout);
              sprintf( gv.transmit.pl.c8, "simulator has stopped" );
              gv.transmit.size =  SOCK_BUF_HEADER_SIZE + strlen( gv.transmit.pl.c8 ) + 1; // +1 -> termination character
+             gv.transmit.command = SHUTDOWN;
          }
          else
          {
@@ -174,7 +175,7 @@ void housekeeping( void *param )
             gv.transmit.command = ERROR;
             printf( "%s\n", gv.transmit.pl.c8 ); fflush(stdout);
          }
-         gv_acknowledge( 1 );
+         gv_acknowledge( 1 ); // response of this process is ready
 
          if( gv.receive.pl.u32[0] == MTI_QUIT_MAGIC )
          {

@@ -1,4 +1,4 @@
-# Copyright 2012, 2013 Andre Pool
+# Copyright 2012-2020 Andre Pool
 # Licensed under the Apache License version 2.0
 # You may not use this file except in compliance with this License
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -25,6 +25,7 @@ work/%: %.vhd
 	@test -d work || vlib -quiet work
 	@# to suppress vcom errors, use -suppress xx, see verror -all for list
 	vcom $(MTI_BITS) -2002 -O5 -pedanticerrors -quiet $<
+	@touch work/$(<:.vhd=)
 
 work/dut: work/counter work/sqrt_int work/comparator work/ram
 
@@ -37,9 +38,11 @@ work/top_opt: work/top
 sim: c_environment work/top_opt vsim.do
 	@# remove -debugdb for optimal performance (added for schematic view)
 	@vsim $(MTI_BITS) -quiet -debugdb -t ns top_opt -do vsim.do
+	@netstat -a | grep 2222
 
 simc: c_environment work/top_opt vsimc.do
 	@vsim $(MTI_BITS) -quiet -c -t ns top_opt -do vsimc.do
+	@netstat -a | grep 2222
 
 c_environment:
 	@$(MAKE) --no-print-directory -C ../src

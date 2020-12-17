@@ -5,6 +5,8 @@
 # You may not use this file except in compliance with this License
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
+exec make -C ../socket control_application
+
 puts "send break signal to simulator"
 set capp "../socket/control_application"
 

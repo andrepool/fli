@@ -1,4 +1,4 @@
-// Copyright 2012 - 2014 Andre Pool
+// Copyright 2012 - 2015 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -83,10 +83,18 @@ void exchange( int *client_sock_file_desc, sock_buf_t *buf )
       {
          printf( "ERROR   got ERROR response back from server\n" );
       }
+      else if( buf->command == SHUTDOWN )
+      {
+          printf( "INFO    got shutdown response from simulator\n" );
+      }
       else if( buf->command != OKAY )
       {
          printf( "ERROR   got wrong %d response back from server\n", buf->command );
       }
+   }
+   else
+   {
+	   buf->size = 0;
    }
 }
 
@@ -471,7 +479,6 @@ int main(int argc, char *argv[])
                break;
             case 'q':
                process_command( &client_sock_file_desc, &buf, MTI_QUIT, optarg, 1 );
-               process_command( &client_sock_file_desc, &buf, DISCONNECT, optarg, 1 );
                close( client_sock_file_desc );
                return EXIT_SUCCESS;
                break;

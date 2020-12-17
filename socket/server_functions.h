@@ -1,4 +1,4 @@
-// Copyright 2012, 2013 Andre Pool
+// Copyright 2012 - 2015 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -15,6 +15,6 @@
  - create response
  - send response to client
 */
-void server_exchange_with_client( int *client_sock_file_desc );
+void server_exchange_with_client( int *client_sock_file_desc, int *shutdown );
 
 #endif /* INCLUDED_SERVER_FUNCTIONS_H */

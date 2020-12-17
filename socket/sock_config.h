@@ -1,4 +1,4 @@
-// Copyright 2012, 2013 Andre Pool
+// Copyright 2012 - 2015 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -10,8 +10,16 @@
 // pthread.h include required for ptread_t
 #include <pthread.h>
 
-#define API_VERSION 12
+#define API_VERSION 13
+
+#define USE_AF_INIT
+#ifdef USE_AF_INIT
+#define TCP_IP_PORT 2222
+#define TCP_IP_ADDRESS "127.0.0.1"
+#else
 #define SOCK_FILE_HANDLE "../socket/sock_file_handle"
+#endif
+
 
 // Command list and response list.
 // This list is used by client to send commands to server, and by server to send back
@@ -45,6 +53,7 @@ typedef enum command_response_list {
    PAYLOAD_READ,
    PAYLOAD_WRITE,
    SEND_EMPTY_MESSAGE, // sending 0 bytes, same server behaviour as disconnect, only for testingsame as disconnect, but only testing
+   SHUTDOWN,
    SQRT_INT_GET,
    SUM_INC,
    SUM_GET,

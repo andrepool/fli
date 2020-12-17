@@ -1,4 +1,4 @@
-# Copyright 2012, 2013 Andre Pool
+# Copyright 2012-2020 Andre Pool
 # Licensed under the Apache License version 2.0
 # you may not use this file except in compliance with this License
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -7,6 +7,14 @@ MAKEFLAGS = -j8
 
 CFLAGS = -g -O2 -Wall -ansi -fms-extensions -std=c99
 CFLAGS += -pedantic
+
+# quick hack to compile it for newer ModelSim and gcc versions
+# TODO: fix this
+CFLAGS += -Wno-restrict
+CFLAGS += -Wno-deprecated-declarations
+CFLAGS += -DUSE_INTERP_RESULT
+CFLAGS += -UTCL_NO_DEPRECATED
+
 LDFLAGS = -shared -Wl,-Bsymbolic -Wl,-export-dynamic -std=c99
 ifeq ($(shell uname -m), x86_64)
    CFLAGS += -m64 -fPIC

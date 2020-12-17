@@ -7,8 +7,13 @@
 
 MAKEFLAGS = -j8
 
-CFLAGS = -g -O2 -Wall -ansi -fms-extensions -std=c99
+CFLAGS = -g -O2 -Wall -ansi -std=c99
 CFLAGS += -pedantic
+
+# quick hack to compile it for newer ModelSim and gcc versions
+# TODO: fix this
+CFLAGS += -Wno-restrict
+
 LDFLAGS = -shared -Wl,-Bsymbolic -Wl,-export-dynamic -std=c99
 ifeq ($(shell uname -m), x86_64)
    CFLAGS += -m64 -fPIC

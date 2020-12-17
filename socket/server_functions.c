@@ -1,4 +1,4 @@
-// Copyright 2012, 2013 Andre Pool
+// Copyright 2012 - 2015 Andre Pool
 // Licensed under the Apache License version 2.0
 // You may not use this file except in compliance with this License
 // You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -81,28 +81,29 @@ void process_command_from_client( int *disconnect )
    }
    else
    {
-      // this command is unknown by server, so maybe it is known by one of the modelsim processes
-      // ask all modelsim processes to have a look and if they now how to process they will respond with a message
-      // if after a while nobody responds, display an error and reject command
+      // this command is unknown by the server, so maybe it is known by one of the simulator threads
+      // ask all simulator threads to have a look and if they know how to process it, they will respond
+      // with a message
+      // display an error and reject command if other thread reacts within a certain time
       
-      gv_acknowledge( 0 ); // clear the previous acknowledge flag from one of the modelsim processes (if any)
-      gv_valid( 1 );// inform the modelsim processes a command is waiting to be processed
+      gv_acknowledge( 0 ); // clear the previous acknowledge flag from one of the simulator thread (if any)
+      gv_valid( 1 );// inform the simulator thread a command is waiting to be processed
 
-      // now wait for the response from a modelsim process
+      // now wait for the response from one of the simulator threads
       int print_warning = 0;
       if( gv.handshake == 0 ) { test_server_provide_data(); }
       while( gv.buf_acknowledge == 0 && gv.handshake == 1 && print_warning < 5000 )
       {
          if( print_warning % 1000 == 999 )
          {
-            printf("WARNING command waiting in buffer to be processed by ModelSim process\n");
+            printf("WARNING command waiting in buffer to be processed by simulator thread\n");
          }
          print_warning++;
          nanosleep((struct timespec[]){{0, 5*1000000}}, NULL); // 5 ms
       }
       if( gv.buf_acknowledge == 0 && gv.handshake == 1 )
       {
-         printf("ERROR   no ModelSim process responded on command %d in buffer with message\n", gv.receive.command );
+         printf("ERROR   no simulator thread responded on command %d in buffer with message\n", gv.receive.command );
          printf("ERROR   %s\n", gv.receive.pl.c8 );
          fflush( stdout );
          gv.transmit.command = ERROR;
@@ -127,7 +128,7 @@ Only when the client is disconnected, this function will return, otherwise
 this function will wait for the following command and respond with the appropriate
 message.
  */
-void server_exchange_with_client( int *client_sock_file_desc )
+void server_exchange_with_client( int *client_sock_file_desc, int *shutdown )
 {
    // create buffer which we can use to receive and transmit data
    int disconnect = 0;
@@ -162,8 +163,14 @@ void server_exchange_with_client( int *client_sock_file_desc )
          else
          {
             // a "valid" message has been received from client, now process the message
-            // printf( "recieved %d bytes\n", gv.receive.size );
+            // printf( "received %d bytes\n", gv.receive.size );
             process_command_from_client( &disconnect );
+            if ( gv.transmit.command == SHUTDOWN )
+            {
+                // if we want to shutdown, do not disconnect from the server side, but from the client side
+                // otherwise the port will be on TIME_WAIT
+                *shutdown = 1;
+            }
             // printf("transmitted %d bytes\n", gv.receive.size );
          }
          // send the appropriate message back to the client

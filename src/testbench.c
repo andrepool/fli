@@ -85,6 +85,7 @@ static void testbench( void *param )
    static unsigned long long clk_cnt = 0;
    static _Bool inc = false;
    static _Bool dec = false;
+   static unsigned int result_d1 = 0;
    
    testbench_t * ip = (testbench_t *) param;
    clk = mti_GetSignalValue ( ip->clk );
@@ -97,11 +98,17 @@ static void testbench( void *param )
       clk_cnt++;
    }
       
-   if( clk_cnt >=3 && clk_cnt <= 7 )
+   if( clk_cnt >=3 && clk_cnt <= 5 )
    {
       rst = true;
    }
     
+   if( clk_cnt == 7 )
+   {
+      set = true;
+      load = read_data;
+   }
+
    if( clk_cnt == 9 )
    {
       set = true;
@@ -128,6 +135,19 @@ static void testbench( void *param )
    {
       inc = true;
       dec = false;
+   }
+   
+   if( clk && result_d1 > 10 && ! cmp )
+   {
+      printf( "error sqrt result %d > 10 but cmp false\n", result_d1);
+   }
+   if( clk && result_d1 < 7 && cmp )
+   {
+      printf( "error sqrt result %d < 7 but cmp true\n", result_d1);
+   }
+   if( clk )
+   {
+      result_d1 = result;
    }
   
    mti_ScheduleDriver( ip->rst, rst, 2, MTI_INERTIAL );
